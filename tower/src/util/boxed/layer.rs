@@ -11,42 +11,6 @@ use tower_service::Service;
 /// This [`Layer`] produces [`BoxService`] instances erasing the type of the
 /// [`Service`] produced by the wrapped [`Layer`].
 ///
-/// # Example
-///
-/// `BoxLayer` can, for example, be useful to create layers dynamically that otherwise wouldn't have
-/// the same types. In this example, we include a [`Timeout`] layer
-/// only if an environment variable is set. We can use `BoxLayer`
-/// to return a consistent type regardless of runtime configuration:
-///
-/// ```
-/// use std::time::Duration;
-/// use tower::{Service, ServiceBuilder, BoxError, util::BoxLayer};
-///
-/// fn common_layer<S, T>() -> BoxLayer<S, T, S::Response, BoxError>
-/// where
-///     S: Service<T> + Send + 'static,
-///     S::Future: Send + 'static,
-///     S::Error: Into<BoxError> + 'static,
-/// {
-///     let builder = ServiceBuilder::new()
-///         .concurrency_limit(100);
-///
-///     if std::env::var("SET_TIMEOUT").is_ok() {
-///         let layer = builder
-///             .timeout(Duration::from_secs(30))
-///             .into_inner();
-///
-///         BoxLayer::new(layer)
-///     } else {
-///         let layer = builder
-///             .map_err(Into::into)
-///             .into_inner();
-///
-///         BoxLayer::new(layer)
-///     }
-/// }
-/// ```
-///
 /// [`Layer`]: tower_layer::Layer
 /// [`Service`]: tower_service::Service
 /// [`BoxService`]: super::BoxService

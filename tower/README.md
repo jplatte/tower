@@ -43,8 +43,7 @@ An additional abstraction, the [`Layer`] trait, is used to compose
 middleware with [`Service`]s. If a [`Service`] can be thought of as an
 asynchronous function from a request type to a response type, a [`Layer`] is
 a function taking a [`Service`] of one type and returning a [`Service`] of a
-different type. The [`ServiceBuilder`] type is used to add middleware to a
-service by composing it with multiple [`Layer`]s.
+different type.
 
 ### The Tower Ecosystem
 
@@ -160,7 +159,6 @@ Tower.
 [timeouts]: https://docs.rs/tower/latest/tower/timeout/
 [rate limiting]: https://docs.rs/tower/latest/tower/limit/rate
 [load balancing]: https://docs.rs/tower/latest/tower/balance/
-[`ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 [utilities]: https://docs.rs/tower/latest/tower/trait.ServiceExt.html
 [`tower`]: https://crates.io/crates/tower
 [`tower-service`]: https://crates.io/crates/tower-service

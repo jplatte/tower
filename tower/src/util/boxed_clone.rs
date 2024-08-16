@@ -14,47 +14,6 @@ use tower_service::Service;
 ///
 /// This is similar to [`BoxService`](super::BoxService) except the resulting
 /// service implements [`Clone`].
-///
-/// # Example
-///
-/// ```
-/// use tower::{Service, ServiceBuilder, BoxError, util::BoxCloneService};
-/// use std::time::Duration;
-/// #
-/// # struct Request;
-/// # struct Response;
-/// # impl Response {
-/// #     fn new() -> Self { Self }
-/// # }
-///
-/// // This service has a complex type that is hard to name
-/// let service = ServiceBuilder::new()
-///     .map_request(|req| {
-///         println!("received request");
-///         req
-///     })
-///     .map_response(|res| {
-///         println!("response produced");
-///         res
-///     })
-///     .load_shed()
-///     .concurrency_limit(64)
-///     .timeout(Duration::from_secs(10))
-///     .service_fn(|req: Request| async {
-///         Ok::<_, BoxError>(Response::new())
-///     });
-/// # let service = assert_service(service);
-///
-/// // `BoxCloneService` will erase the type so it's nameable
-/// let service: BoxCloneService<Request, Response, BoxError> = BoxCloneService::new(service);
-/// # let service = assert_service(service);
-///
-/// // And we can still clone the service
-/// let cloned_service = service.clone();
-/// #
-/// # fn assert_service<S, R>(svc: S) -> S
-/// # where S: Service<R> { svc }
-/// ```
 pub struct BoxCloneService<T, U, E>(
     Box<
         dyn CloneService<T, Response = U, Error = E, Future = BoxFuture<'static, Result<U, E>>>

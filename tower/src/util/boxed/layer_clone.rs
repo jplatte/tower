@@ -23,9 +23,10 @@ use tower_service::Service;
 ///
 /// ```
 /// use std::time::Duration;
-/// use tower::{Service, ServiceBuilder, BoxError};
-/// use tower::util::{BoxCloneServiceLayer, BoxCloneService};
-///
+/// use tower::{service_fn, Layer, Service, BoxError};
+/// use tower::limit::concurrency::ConcurrencyLimitLayer;
+/// use tower::timeout::TimeoutLayer;
+/// use tower::util::{BoxCloneServiceLayer, BoxCloneService, MapErrLayer};
 /// #
 /// # struct Request;
 /// # struct Response;
@@ -39,21 +40,13 @@ use tower_service::Service;
 ///     S::Future: Send + 'static,
 ///     S::Error: Into<BoxError> + 'static,
 /// {
-///     let builder = ServiceBuilder::new()
-///         .concurrency_limit(100);
+///     let concurrency_limit = ConcurrencyLimitLayer::new(100);
 ///
 ///     if std::env::var("SET_TIMEOUT").is_ok() {
-///         let layer = builder
-///             .timeout(Duration::from_secs(30))
-///             .into_inner();
-///
-///         BoxCloneServiceLayer::new(layer)
+///         let timeout = TimeoutLayer::new(Duration::from_secs(30));
+///         BoxCloneServiceLayer::new((concurrency_limit, timeout))
 ///     } else {
-///         let layer = builder
-///             .map_err(Into::into)
-///             .into_inner();
-///
-///         BoxCloneServiceLayer::new(layer)
+///         BoxCloneServiceLayer::new((concurrency_limit, MapErrLayer::new(Into::into)))
 ///     }
 /// }
 ///
@@ -63,10 +56,10 @@ use tower_service::Service;
 /// let cloned_layer = boxed_clone_layer.clone();
 ///
 /// // Using the `BoxCloneServiceLayer` we can create a `BoxCloneService`
-/// let service: BoxCloneService<Request, Response, BoxError> = ServiceBuilder::new().layer(boxed_clone_layer)
-///      .service_fn(|req: Request| async {
+/// let service: BoxCloneService<Request, Response, BoxError> = boxed_clone_layer
+///     .layer(service_fn(|req: Request| async {
 ///         Ok::<_, BoxError>(Response::new())
-///     });
+///     }));
 ///
 /// # let service = assert_service(service);
 ///
@@ -75,7 +68,6 @@ use tower_service::Service;
 /// #
 /// # fn assert_service<S, R>(svc: S) -> S
 /// # where S: Service<R> { svc }
-///
 /// ```
 ///
 /// [`Layer`]: tower_layer::Layer
