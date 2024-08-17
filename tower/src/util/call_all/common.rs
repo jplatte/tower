@@ -128,12 +128,6 @@ where
                 .as_mut()
                 .expect("Using CallAll after extracting inner Service");
 
-            if let Err(e) = ready!(svc.poll_ready(cx)) {
-                // Set eof to prevent the service from being called again after a `poll_ready` error
-                *this.eof = true;
-                return Poll::Ready(Some(Err(e)));
-            }
-
             // Unwrap: The check above always sets `this.curr_req` if none.
             this.queue.push(svc.call(this.curr_req.take().unwrap()));
         }

@@ -99,10 +99,6 @@ where
     type Error = Fut::Error;
     type Future = AndThenFuture<S::Future, Fut, F>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
-
     fn call(&mut self, request: Request) -> Self::Future {
         AndThenFuture::new(self.inner.call(request).err_into().and_then(self.f.clone()))
     }

@@ -14,7 +14,6 @@
 //! used as the foundation for the rest of Tower.
 
 use std::future::Future;
-use std::task::{Context, Poll};
 
 /// An asynchronous function from a `Request` to a `Response`.
 ///
@@ -55,10 +54,6 @@ use std::task::{Context, Poll};
 ///     type Response = Response<Vec<u8>>;
 ///     type Error = http::Error;
 ///     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         Poll::Ready(Ok(()))
-///     }
 ///
 ///     fn call(&mut self, req: Request<Vec<u8>>) -> Self::Future {
 ///         // create the body
@@ -166,12 +161,6 @@ use std::task::{Context, Poll};
 ///     type Error = Box<dyn Error + Send + Sync>;
 ///     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 ///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         // Our timeout service is ready if the inner service is ready.
-///         // This is how backpressure can be propagated through a tree of nested services.
-///        self.inner.poll_ready(cx).map_err(Into::into)
-///     }
-///
 ///     fn call(&mut self, req: Request) -> Self::Future {
 ///         // Create a future that completes after `self.timeout`
 ///         let timeout = tokio::time::sleep(self.timeout);
@@ -221,93 +210,6 @@ use std::task::{Context, Poll};
 /// The above timeout implementation is decoupled from the underlying protocol
 /// and is also decoupled from client or server concerns. In other words, the
 /// same timeout middleware could be used in either a client or a server.
-///
-/// # Backpressure
-///
-/// Calling a `Service` which is at capacity (i.e., it is temporarily unable to process a
-/// request) should result in an error. The caller is responsible for ensuring
-/// that the service is ready to receive the request before calling it.
-///
-/// `Service` provides a mechanism by which the caller is able to coordinate
-/// readiness. `Service::poll_ready` returns `Ready` if the service expects that
-/// it is able to process a request.
-///
-/// # Be careful when cloning inner services
-///
-/// Services are permitted to panic if `call` is invoked without obtaining `Poll::Ready(Ok(()))`
-/// from `poll_ready`. You should therefore be careful when cloning services for example to move
-/// them into boxed futures. Even though the original service is ready, the clone might not be.
-///
-/// Therefore this kind of code is wrong and might panic:
-///
-/// ```rust
-/// # use std::pin::Pin;
-/// # use std::task::{Poll, Context};
-/// # use std::future::Future;
-/// # use tower_service::Service;
-/// #
-/// struct Wrapper<S> {
-///     inner: S,
-/// }
-///
-/// impl<R, S> Service<R> for Wrapper<S>
-/// where
-///     S: Service<R> + Clone + 'static,
-///     R: 'static,
-/// {
-///     type Response = S::Response;
-///     type Error = S::Error;
-///     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         self.inner.poll_ready(cx)
-///     }
-///
-///     fn call(&mut self, req: R) -> Self::Future {
-///         let mut inner = self.inner.clone();
-///         Box::pin(async move {
-///             // `inner` might not be ready since its a clone
-///             inner.call(req).await
-///         })
-///     }
-/// }
-/// ```
-///
-/// You should instead use [`std::mem::replace`] to take the service that was ready:
-///
-/// ```rust
-/// # use std::pin::Pin;
-/// # use std::task::{Poll, Context};
-/// # use std::future::Future;
-/// # use tower_service::Service;
-/// #
-/// struct Wrapper<S> {
-///     inner: S,
-/// }
-///
-/// impl<R, S> Service<R> for Wrapper<S>
-/// where
-///     S: Service<R> + Clone + 'static,
-///     R: 'static,
-/// {
-///     type Response = S::Response;
-///     type Error = S::Error;
-///     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         self.inner.poll_ready(cx)
-///     }
-///
-///     fn call(&mut self, req: R) -> Self::Future {
-///         let clone = self.inner.clone();
-///         // take the service that was ready
-///         let mut inner = std::mem::replace(&mut self.inner, clone);
-///         Box::pin(async move {
-///             inner.call(req).await
-///         })
-///     }
-/// }
-/// ```
 pub trait Service<Request> {
     /// Responses given by the service.
     type Response;
@@ -318,39 +220,7 @@ pub trait Service<Request> {
     /// The future response value.
     type Future: Future<Output = Result<Self::Response, Self::Error>>;
 
-    /// Returns `Poll::Ready(Ok(()))` when the service is able to process requests.
-    ///
-    /// If the service is at capacity, then `Poll::Pending` is returned and the task
-    /// is notified when the service becomes ready again. This function is
-    /// expected to be called while on a task. Generally, this can be done with
-    /// a simple `futures::future::poll_fn` call.
-    ///
-    /// If `Poll::Ready(Err(_))` is returned, the service is no longer able to service requests
-    /// and the caller should discard the service instance.
-    ///
-    /// Once `poll_ready` returns `Poll::Ready(Ok(()))`, a request may be dispatched to the
-    /// service using `call`. Until a request is dispatched, repeated calls to
-    /// `poll_ready` must return either `Poll::Ready(Ok(()))` or `Poll::Ready(Err(_))`.
-    ///
-    /// Note that `poll_ready` may reserve shared resources that are consumed in a subsequent
-    /// invocation of `call`. Thus, it is critical for implementations to not assume that `call`
-    /// will always be invoked and to ensure that such resources are released if the service is
-    /// dropped before `call` is invoked or the future returned by `call` is dropped before it
-    /// is polled.
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>>;
-
     /// Process the request and return the response asynchronously.
-    ///
-    /// This function is expected to be callable off task. As such,
-    /// implementations should take care to not call `poll_ready`.
-    ///
-    /// Before dispatching a request, `poll_ready` must be called and return
-    /// `Poll::Ready(Ok(()))`.
-    ///
-    /// # Panics
-    ///
-    /// Implementations are permitted to panic if `call` is invoked without
-    /// obtaining `Poll::Ready(Ok(()))` from `poll_ready`.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     fn call(&mut self, req: Request) -> Self::Future;
 }
@@ -362,10 +232,6 @@ where
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
-        (**self).poll_ready(cx)
-    }
 
     fn call(&mut self, request: Request) -> S::Future {
         (**self).call(request)
@@ -379,10 +245,6 @@ where
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
-        (**self).poll_ready(cx)
-    }
 
     fn call(&mut self, request: Request) -> S::Future {
         (**self).call(request)

@@ -109,25 +109,25 @@ where
     }
 }
 
-/// A sampler modified from the Rand implementation for use internally for the balance middleware.
-///
-/// It's an implementation of Floyd's combination algorithm with amount fixed at 2. This uses no allocated
-/// memory and finishes in constant time (only 2 random calls).
-///
-/// ref: This was borrowed and modified from the following Rand implementation
-/// https://github.com/rust-random/rand/blob/b73640705d6714509f8ceccc49e8df996fa19f51/src/seq/index.rs#L375-L411
-pub(crate) fn sample_floyd2<R: Rng>(rng: &mut R, length: u64) -> [u64; 2] {
-    debug_assert!(2 <= length);
-    let aidx = rng.next_range(0..length - 1);
-    let bidx = rng.next_range(0..length);
-    let aidx = if aidx == bidx { length - 1 } else { aidx };
-    [aidx, bidx]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use quickcheck::*;
+
+    /// A sampler modified from the Rand implementation for use internally for the balance middleware.
+    ///
+    /// It's an implementation of Floyd's combination algorithm with amount fixed at 2. This uses no allocated
+    /// memory and finishes in constant time (only 2 random calls).
+    ///
+    /// ref: This was borrowed and modified from the following Rand implementation
+    /// https://github.com/rust-random/rand/blob/b73640705d6714509f8ceccc49e8df996fa19f51/src/seq/index.rs#L375-L411
+    pub(crate) fn _sample_floyd2<R: Rng>(rng: &mut R, length: u64) -> [u64; 2] {
+        debug_assert!(2 <= length);
+        let aidx = rng.next_range(0..length - 1);
+        let bidx = rng.next_range(0..length);
+        let aidx = if aidx == bidx { length - 1 } else { aidx };
+        [aidx, bidx]
+    }
 
     quickcheck! {
         fn next_f64(counter: u64) -> TestResult {
@@ -139,7 +139,7 @@ mod tests {
         }
 
         fn next_range(counter: u64, range: Range<u64>) -> TestResult {
-            if  range.start >= range.end{
+            if range.start >= range.end{
                 return TestResult::discard();
             }
 
@@ -159,7 +159,7 @@ mod tests {
             let mut rng = HasherRng::default();
             rng.counter = counter;
 
-            let [a, b] = super::sample_floyd2(&mut rng, length);
+            let [a, b] = _sample_floyd2(&mut rng, length);
 
             if a >= length || b >= length || a == b {
                 return TestResult::failed();
@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn sample_inplace_boundaries() {
         let mut r = HasherRng::default();
-        match super::sample_floyd2(&mut r, 2) {
+        match _sample_floyd2(&mut r, 2) {
             [0, 1] | [1, 0] => (),
             array => panic!("unexpected inplace boundaries: {:?}", array),
         }

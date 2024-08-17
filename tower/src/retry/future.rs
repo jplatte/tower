@@ -38,7 +38,7 @@ pin_project! {
             #[pin]
             waiting: P
         },
-        // Polling [`Service::poll_ready`] after [`Waiting`] was OK.
+        // Polling `Service::poll_ready` after [`Waiting`] was OK.
         Retrying,
     }
 }
@@ -93,18 +93,6 @@ where
                     this.state.set(State::Retrying);
                 }
                 StateProj::Retrying => {
-                    // NOTE: we assume here that
-                    //
-                    //   this.retry.poll_ready()
-                    //
-                    // is equivalent to
-                    //
-                    //   this.retry.service.poll_ready()
-                    //
-                    // we need to make that assumption to avoid adding an Unpin bound to the Policy
-                    // in Ready to make it Unpin so that we can get &mut Ready as needed to call
-                    // poll_ready on it.
-                    ready!(this.retry.as_mut().project().service.poll_ready(cx))?;
                     let req = this
                         .request
                         .take()

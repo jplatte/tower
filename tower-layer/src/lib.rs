@@ -73,10 +73,6 @@ pub use self::{
 ///     type Error = S::Error;
 ///     type Future = S::Future;
 ///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         self.service.poll_ready(cx)
-///     }
-///
 ///     fn call(&mut self, request: Request) -> Self::Future {
 ///         // Insert log statement here or other functionality
 ///         println!("request = {:?}, target = {:?}", request, self.target);

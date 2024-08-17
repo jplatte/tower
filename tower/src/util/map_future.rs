@@ -1,8 +1,4 @@
-use std::{
-    fmt,
-    future::Future,
-    task::{Context, Poll},
-};
+use std::{fmt, future::Future};
 use tower_layer::Layer;
 use tower_service::Service;
 
@@ -56,10 +52,6 @@ where
     type Response = T;
     type Error = E;
     type Future = Fut;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(From::from)
-    }
 
     fn call(&mut self, req: R) -> Self::Future {
         (self.f)(self.inner.call(req))

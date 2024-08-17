@@ -96,16 +96,6 @@ impl Service<()> for AssertSpanSvc {
     type Error = AssertSpanError;
     type Future = future::Ready<Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.polled {
-            return Poll::Ready(self.check("poll_ready"));
-        }
-
-        cx.waker().wake_by_ref();
-        self.polled = true;
-        Poll::Pending
-    }
-
     fn call(&mut self, _: ()) -> Self::Future {
         future::ready(self.check("call"))
     }

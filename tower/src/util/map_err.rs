@@ -1,6 +1,5 @@
 use futures_util::{future, TryFutureExt};
 use std::fmt;
-use std::task::{Context, Poll};
 use tower_layer::Layer;
 use tower_service::Service;
 
@@ -64,11 +63,6 @@ where
     type Response = S::Response;
     type Error = Error;
     type Future = MapErrFuture<S::Future, F>;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(self.f.clone())
-    }
 
     #[inline]
     fn call(&mut self, request: Request) -> Self::Future {

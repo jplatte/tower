@@ -11,7 +11,6 @@ pub use self::policy::Policy;
 
 use self::future::ResponseFuture;
 use pin_project_lite::pin_project;
-use std::task::{Context, Poll};
 use tower_service::Service;
 
 pin_project! {
@@ -26,8 +25,6 @@ pin_project! {
     /// order to retry the request in the event of a failure. If the inner
     /// `Service` type does not implement `Clone`, the [`Buffer`] middleware
     /// can be added to make any `Service` cloneable.
-    ///
-    /// [`Buffer`]: crate::buffer::Buffer
     ///
     /// The `Policy` must also implement `Clone`. This middleware will
     /// clone the policy for each _request session_. This means a new clone
@@ -77,13 +74,6 @@ where
     type Response = S::Response;
     type Error = S::Error;
     type Future = ResponseFuture<P, S, Request>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // NOTE: the Future::poll impl for ResponseFuture assumes that Retry::poll_ready is
-        // equivalent to Ready.service.poll_ready. If this ever changes, that code must be updated
-        // as well.
-        self.service.poll_ready(cx)
-    }
 
     fn call(&mut self, request: Request) -> Self::Future {
         let cloned = self.policy.clone_request(&request);

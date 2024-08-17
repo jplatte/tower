@@ -1,9 +1,6 @@
 use super::ServiceExt;
 use futures_util::future::BoxFuture;
-use std::{
-    fmt,
-    task::{Context, Poll},
-};
+use std::fmt;
 use tower_layer::{layer_fn, LayerFn};
 use tower_service::Service;
 
@@ -49,11 +46,6 @@ impl<T, U, E> Service<T> for BoxCloneService<T, U, E> {
     type Response = U;
     type Error = E;
     type Future = BoxFuture<'static, Result<U, E>>;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), E>> {
-        self.0.poll_ready(cx)
-    }
 
     #[inline]
     fn call(&mut self, request: T) -> Self::Future {

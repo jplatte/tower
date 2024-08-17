@@ -33,13 +33,6 @@ where
     type Error = A::Error;
     type Future = EitherResponseFuture<A::Future, B::Future>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self {
-            Either::Left(service) => service.poll_ready(cx),
-            Either::Right(service) => service.poll_ready(cx),
-        }
-    }
-
     fn call(&mut self, request: Request) -> Self::Future {
         match self {
             Either::Left(service) => EitherResponseFuture {

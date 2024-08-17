@@ -6,16 +6,13 @@ mod boxed_clone;
 mod call_all;
 mod either;
 
-mod future_service;
 mod map_err;
 mod map_request;
 mod map_response;
 mod map_result;
 
 mod map_future;
-mod oneshot;
 mod optional;
-mod ready;
 mod service_fn;
 mod then;
 
@@ -26,15 +23,12 @@ pub use self::{
     boxed::{BoxCloneServiceLayer, BoxLayer, BoxService, UnsyncBoxService},
     boxed_clone::BoxCloneService,
     either::Either,
-    future_service::{future_service, FutureService},
     map_err::{MapErr, MapErrLayer},
     map_future::{MapFuture, MapFutureLayer},
     map_request::{MapRequest, MapRequestLayer},
     map_response::{MapResponse, MapResponseLayer},
     map_result::{MapResult, MapResultLayer},
-    oneshot::Oneshot,
     optional::Optional,
-    ready::{Ready, ReadyOneshot},
     service_fn::{service_fn, ServiceFn},
     then::{Then, ThenLayer},
 };
@@ -65,30 +59,6 @@ pub mod future {
 /// An extension trait for `Service`s that provides a variety of convenient
 /// adapters
 pub trait ServiceExt<Request>: tower_service::Service<Request> {
-    /// Yields a mutable reference to the service when it is ready to accept a request.
-    fn ready(&mut self) -> Ready<'_, Self, Request>
-    where
-        Self: Sized,
-    {
-        Ready::new(self)
-    }
-
-    /// Yields the service when it is ready to accept a request.
-    fn ready_oneshot(self) -> ReadyOneshot<Self, Request>
-    where
-        Self: Sized,
-    {
-        ReadyOneshot::new(self)
-    }
-
-    /// Consume this `Service`, calling it with the provided request once it is ready.
-    fn oneshot(self, req: Request) -> Oneshot<Self, Request>
-    where
-        Self: Sized,
-    {
-        Oneshot::new(self, req)
-    }
-
     /// Process all requests from the given [`Stream`], and produce a [`Stream`] of their responses.
     ///
     /// This is essentially [`Stream<Item = Request>`][stream] + `Self` => [`Stream<Item =
@@ -105,15 +75,13 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
         CallAll::new(self, reqs)
     }
 
-    /// Executes a new future after this service's future resolves. This does
-    /// not alter the behaviour of the [`poll_ready`] method.
+    /// Executes a new future after this service's future resolves.
     ///
     /// This method can be used to change the [`Response`] type of the service
     /// into a different type. You can use this method to chain along a computation once the
     /// service's response has been resolved.
     ///
     /// [`Response`]: crate::Service::Response
-    /// [`poll_ready`]: crate::Service::poll_ready
     ///
     /// # Example
     /// ```
@@ -136,10 +104,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Record;
     /// #   type Error = u8;
     /// #   type Future = futures_util::future::Ready<Result<Record, u8>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(Record { name: "Jack".into(), age: 32 }))
@@ -173,8 +137,7 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
         AndThen::new(self, f)
     }
 
-    /// Maps this service's response value to a different value. This does not
-    /// alter the behaviour of the [`poll_ready`] method.
+    /// Maps this service's response value to a different value.
     ///
     /// This method can be used to change the [`Response`] type of the service
     /// into a different type. It is similar to the [`Result::map`]
@@ -182,7 +145,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// service's response has been resolved.
     ///
     /// [`Response`]: crate::Service::Response
-    /// [`poll_ready`]: crate::Service::poll_ready
     ///
     /// # Example
     /// ```
@@ -205,10 +167,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Record;
     /// #   type Error = u8;
     /// #   type Future = futures_util::future::Ready<Result<Record, u8>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(Record { name: "Jack".into(), age: 32 }))
@@ -242,14 +200,12 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
         MapResponse::new(self, f)
     }
 
-    /// Maps this service's error value to a different value. This does not
-    /// alter the behaviour of the [`poll_ready`] method.
+    /// Maps this service's error value to a different value.
     ///
     /// This method can be used to change the [`Error`] type of the service
     /// into a different type. It is similar to the [`Result::map_err`] method.
     ///
     /// [`Error`]: crate::Service::Error
-    /// [`poll_ready`]: crate::Service::poll_ready
     ///
     /// # Example
     /// ```
@@ -272,10 +228,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = String;
     /// #   type Error = Error;
     /// #   type Future = futures_util::future::Ready<Result<String, Error>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(String::new()))
@@ -331,12 +283,7 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     ///
     /// This method can be used to change the [`Response`] type of the service
     /// into a different type. It can also be used to change the [`Error`] type
-    /// of the service. However, because the [`map_result`] function is not applied
-    /// to the errors returned by the service's [`poll_ready`] method, it must
-    /// be possible to convert the service's [`Error`] type into the error type
-    /// returned by the [`map_result`] function. This is trivial when the function
-    /// returns the same error type as the service, but in other cases, it can
-    /// be useful to use [`BoxError`] to erase differing error types.
+    /// of the service.
     ///
     /// # Examples
     ///
@@ -367,10 +314,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Vec<Record>;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<Vec<Record>, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(vec![Record { name: "Jack".into(), age: 32 }]))
@@ -427,10 +370,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Record;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<Record, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(Record { name: "Jack".into(), age: 32 }))
@@ -492,10 +431,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Error = u8;
     /// #   type Future = futures_util::future::Ready<Result<String, u8>>;
     /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
-    /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(String::new()))
     /// #   }
@@ -529,7 +464,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// [`map_result`]: ServiceExt::map_result
     /// [`Error`]: crate::Service::Error
     /// [`Response`]: crate::Service::Response
-    /// [`poll_ready`]: crate::Service::poll_ready
     /// [`BoxError`]: crate::BoxError
     fn map_result<F, Response, Error>(self, f: F) -> MapResult<Self, F>
     where
@@ -562,10 +496,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = String;
     /// #   type Error = u8;
     /// #   type Future = futures_util::future::Ready<Result<String, u8>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: String) -> Self::Future {
     /// #       futures_util::future::ready(Ok(String::new()))
@@ -630,10 +560,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = String;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<String, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(String::new()))
@@ -703,10 +629,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = String;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<String, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(String::new()))
@@ -778,12 +700,7 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     ///
     /// This method can be used to change the [`Response`] type of the service
     /// into a different type. It can also be used to change the [`Error`] type
-    /// of the service. However, because the `then` function is not applied
-    /// to the errors returned by the service's [`poll_ready`] method, it must
-    /// be possible to convert the service's [`Error`] type into the error type
-    /// returned by the `then` future. This is trivial when the function
-    /// returns the same error type as the service, but in other cases, it can
-    /// be useful to use [`BoxError`] to erase differing error types.
+    /// of the service.
     ///
     /// # Examples
     ///
@@ -805,10 +722,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Record;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<Record, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(()))
@@ -854,7 +767,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// [`FutureExt::then`]: https://docs.rs/futures/latest/futures/future/trait.FutureExt.html#method.then
     /// [`Error`]: crate::Service::Error
     /// [`Response`]: crate::Service::Response
-    /// [`poll_ready`]: crate::Service::poll_ready
     /// [`BoxError`]: crate::BoxError
     fn then<F, Response, Error, Fut>(self, f: F) -> Then<Self, F>
     where
@@ -891,10 +803,6 @@ pub trait ServiceExt<Request>: tower_service::Service<Request> {
     /// #   type Response = Record;
     /// #   type Error = DbError;
     /// #   type Future = futures_util::future::Ready<Result<Record, DbError>>;
-    /// #
-    /// #   fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    /// #       Poll::Ready(Ok(()))
-    /// #   }
     /// #
     /// #   fn call(&mut self, request: u32) -> Self::Future {
     /// #       futures_util::future::ready(Ok(()))

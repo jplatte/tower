@@ -68,8 +68,7 @@
 //! # Ok(())
 //! # }
 //! ```
-use std::task::{Context, Poll};
-use std::{collections::VecDeque, fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData};
 use tower_service::Service;
 
 /// This is how callers of [`Steer`] tell it which `Service` a `Req` corresponds to.
@@ -92,22 +91,16 @@ where
 /// An example use case is a sharded service.
 /// It accepts new requests, then:
 /// 1. Determines, via the provided [`Picker`], which [`Service`] the request corresponds to.
-/// 2. Waits (in [`Service::poll_ready`]) for *all* services to be ready.
-/// 3. Calls the correct [`Service`] with the request, and returns a future corresponding to the
+/// 2. Calls the correct [`Service`] with the request, and returns a future corresponding to the
 ///    call.
 ///
 /// Note that [`Steer`] must wait for all services to be ready since it can't know ahead of time
 /// which [`Service`] the next message will arrive for, and is unwilling to buffer items
 /// indefinitely. This will cause head-of-line blocking unless paired with a [`Service`] that does
-/// buffer items indefinitely, and thus always returns [`Poll::Ready`]. For example, wrapping each
-/// component service with a [`Buffer`] with a high enough limit (the maximum number of concurrent
-/// requests) will prevent head-of-line blocking in [`Steer`].
-///
-/// [`Buffer`]: crate::buffer::Buffer
+/// buffer items indefinitely, and thus always returns [`Poll::Ready`].
 pub struct Steer<S, F, Req> {
     router: F,
     services: Vec<S>,
-    not_ready: VecDeque<usize>,
     _phantom: PhantomData<Req>,
 }
 
@@ -117,11 +110,9 @@ impl<S, F, Req> Steer<S, F, Req> {
     /// Note: the order of the [`Service`]'s is significant for [`Picker::pick`]'s return value.
     pub fn new(services: impl IntoIterator<Item = S>, router: F) -> Self {
         let services: Vec<_> = services.into_iter().collect();
-        let not_ready: VecDeque<_> = services.iter().enumerate().map(|(i, _)| i).collect();
         Self {
             router,
             services,
-            not_ready,
             _phantom: PhantomData,
         }
     }
@@ -136,34 +127,9 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        loop {
-            // must wait for *all* services to be ready.
-            // this will cause head-of-line blocking unless the underlying services are always ready.
-            if self.not_ready.is_empty() {
-                return Poll::Ready(Ok(()));
-            } else {
-                if self.services[self.not_ready[0]]
-                    .poll_ready(cx)?
-                    .is_pending()
-                {
-                    return Poll::Pending;
-                }
-
-                self.not_ready.pop_front();
-            }
-        }
-    }
-
     fn call(&mut self, req: Req) -> Self::Future {
-        assert!(
-            self.not_ready.is_empty(),
-            "Steer must wait for all services to be ready. Did you forget to call poll_ready()?"
-        );
-
         let idx = self.router.pick(&req, &self.services[..]);
         let cl = &mut self.services[idx];
-        self.not_ready.push_back(idx);
         cl.call(req)
     }
 }
@@ -177,7 +143,6 @@ where
         Self {
             router: self.router.clone(),
             services: self.services.clone(),
-            not_ready: self.not_ready.clone(),
             _phantom: PhantomData,
         }
     }
@@ -192,13 +157,11 @@ where
         let Self {
             router,
             services,
-            not_ready,
             _phantom,
         } = self;
         f.debug_struct("Steer")
             .field("router", router)
             .field("services", services)
-            .field("not_ready", not_ready)
             .finish()
     }
 }

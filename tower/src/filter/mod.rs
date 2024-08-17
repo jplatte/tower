@@ -35,7 +35,6 @@ pub use self::{
 use self::future::{AsyncResponseFuture, ResponseFuture};
 use crate::BoxError;
 use futures_util::{future::Either, TryFutureExt};
-use std::task::{Context, Poll};
 use tower_service::Service;
 
 /// Conditionally dispatch requests to the inner service based on a [predicate].
@@ -107,10 +106,6 @@ where
     type Error = BoxError;
     type Future = ResponseFuture<T::Response, T::Future>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
-
     fn call(&mut self, request: Request) -> Self::Future {
         ResponseFuture::new(match self.predicate.check(request) {
             Ok(request) => Either::Right(self.inner.call(request).err_into()),
@@ -168,10 +163,6 @@ where
     type Response = T::Response;
     type Error = BoxError;
     type Future = AsyncResponseFuture<U, T, Request>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
 
     fn call(&mut self, request: Request) -> Self::Future {
         use std::mem;

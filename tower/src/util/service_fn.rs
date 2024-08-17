@@ -1,6 +1,5 @@
 use std::fmt;
 use std::future::Future;
-use std::task::{Context, Poll};
 use tower_service::Service;
 
 /// Returns a new [`ServiceFn`] with the given closure.
@@ -71,10 +70,6 @@ where
     type Response = R;
     type Error = E;
     type Future = F;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), E>> {
-        Ok(()).into()
-    }
 
     fn call(&mut self, req: Request) -> Self::Future {
         (self.f)(req)

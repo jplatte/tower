@@ -22,11 +22,11 @@
 //! response or an error. This abstraction can be used to model both clients and
 //! servers.
 //!
-//! Generic components, like [`timeout`], [rate limiting], and [load balancing],
-//! can be modeled as [`Service`]s that wrap some inner service and apply
-//! additional behavior before or after the inner service is called. This allows
-//! implementing these components in a protocol-agnostic, composable way. Typically,
-//! such services are referred to as _middleware_.
+//! Generic components like [`timeout`] can be modeled as [`Service`]s that wrap
+//! some inner service and apply additional behavior before or after the inner
+//! service is called. This allows implementing these components in a
+//! protocol-agnostic, composable way. Typically, such services are referred to
+//! as _middleware_.
 //!
 //! An additional abstraction, the [`Layer`] trait, is used to compose
 //! middleware with [`Service`]s. If a [`Service`] can be thought of as an
@@ -148,7 +148,6 @@
 //! [`Service`]: crate::Service
 //! [`Layer`]: crate::Layer
 //! [rate limiting]: crate::limit::rate
-//! [load balancing]: crate::balance
 //! [utilities]: crate::ServiceExt
 //! [`tower`]: https://crates.io/crates/tower
 //! [`tower-service`]: https://crates.io/crates/tower-service
@@ -160,33 +159,15 @@
 
 #[macro_use]
 pub(crate) mod macros;
-#[cfg(feature = "balance")]
-pub mod balance;
-#[cfg(feature = "buffer")]
-pub mod buffer;
 #[cfg(feature = "discover")]
 pub mod discover;
 #[cfg(feature = "filter")]
 pub mod filter;
-#[cfg(feature = "hedge")]
-pub mod hedge;
-#[cfg(feature = "limit")]
-pub mod limit;
-#[cfg(feature = "load")]
-pub mod load;
-#[cfg(feature = "load-shed")]
-pub mod load_shed;
 
 #[cfg(feature = "make")]
 pub mod make;
-#[cfg(feature = "ready-cache")]
-pub mod ready_cache;
-#[cfg(feature = "reconnect")]
-pub mod reconnect;
 #[cfg(feature = "retry")]
 pub mod retry;
-#[cfg(feature = "spawn-ready")]
-pub mod spawn_ready;
 #[cfg(feature = "steer")]
 pub mod steer;
 #[cfg(feature = "timeout")]

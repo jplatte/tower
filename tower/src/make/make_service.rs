@@ -4,7 +4,6 @@ use crate::sealed::Sealed;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::task::{Context, Poll};
 use tower_service::Service;
 
 pub(crate) mod shared;
@@ -33,16 +32,6 @@ pub trait MakeService<Target, Request>: Sealed<(Target, Request)> {
 
     /// The future of the [`Service`] instance.
     type Future: Future<Output = Result<Self::Service, Self::MakeError>>;
-
-    /// Returns [`Poll::Ready`] when the factory is able to create more services.
-    ///
-    /// If the service is at capacity, then [`Poll::Pending`] is returned and the task
-    /// is notified when the service becomes ready again. This function is
-    /// expected to be called while on a task.
-    ///
-    /// [`Poll::Ready`]: std::task::Poll::Ready
-    /// [`Poll::Pending`]: std::task::Poll::Pending
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::MakeError>>;
 
     /// Create and return a new service value asynchronously.
     fn make_service(&mut self, target: Target) -> Self::Future;
@@ -147,10 +136,6 @@ where
     type MakeError = M::Error;
     type Future = M::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::MakeError>> {
-        Service::poll_ready(self, cx)
-    }
-
     fn make_service(&mut self, target: Target) -> Self::Future {
         Service::call(self, target)
     }
@@ -199,11 +184,6 @@ where
     type Future = M::Future;
 
     #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.make.poll_ready(cx)
-    }
-
-    #[inline]
     fn call(&mut self, target: Target) -> Self::Future {
         self.make.make_service(target)
     }
@@ -238,11 +218,6 @@ where
     type Response = M::Response;
     type Error = M::Error;
     type Future = M::Future;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.make.poll_ready(cx)
-    }
 
     #[inline]
     fn call(&mut self, target: Target) -> Self::Future {

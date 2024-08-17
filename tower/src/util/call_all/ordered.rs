@@ -38,10 +38,6 @@ pin_project! {
     ///      type Error = Box<dyn Error + Send + Sync>;
     ///      type Future = Ready<Result<Self::Response, Self::Error>>;
     ///
-    ///      fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    ///          Poll::Ready(Ok(()))
-    ///      }
-    ///
     ///      fn call(&mut self, req: &'static str) -> Self::Future {
     ///          ready(Ok(&req[..1]))
     ///      }

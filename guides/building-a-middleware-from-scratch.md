@@ -73,12 +73,6 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Our middleware doesn't care about backpressure, so it's ready as long
-        // as the inner service is ready.
-        self.inner.poll_ready(cx)
-    }
-
     fn call(&mut self, request: Request) -> Self::Future {
         self.inner.call(request)
     }
@@ -150,10 +144,6 @@ where
 
     // Use our new `ResponseFuture` type.
     type Future = ResponseFuture<S::Future>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
 
     fn call(&mut self, request: Request) -> Self::Future {
         let response_future = self.inner.call(request);
@@ -502,11 +492,6 @@ where
     type Error = BoxError;
     type Future = ResponseFuture<S::Future>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Have to map the error type here as well.
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
-
     fn call(&mut self, request: Request) -> Self::Future {
         let response_future = self.inner.call(request);
         let sleep = tokio::time::sleep(self.timeout);
@@ -558,10 +543,6 @@ where
     type Response = S::Response;
     type Error = BoxError;
     type Future = ResponseFuture<S::Future>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
 
     fn call(&mut self, request: Request) -> Self::Future {
         let response_future = self.inner.call(request);
@@ -646,8 +627,6 @@ middleware. If you want more practice here are some exercises to play with:
 - Implement `Service` adapters similar to `Result::map` and `Result::map_err`
   that transforms the request, response, or error using a closure given by the
   user.
-- Implement [`ConcurrencyLimit`]. Hint: You're going to need [`PollSemaphore`] to
-  implement `poll_ready`.
 
 If you have questions you're welcome to post in `#tower` in the [Tokio Discord
 server][discord].

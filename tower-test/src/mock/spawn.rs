@@ -1,6 +1,5 @@
 //! Spawn mock services onto a mock task.
 
-use std::task::Poll;
 use tokio_test::task;
 use tower_service::Service;
 
@@ -28,17 +27,6 @@ impl<T> Spawn<T> {
     /// Get how many futurs are holding onto the waker.
     pub fn waker_ref_count(&self) -> usize {
         self.task.waker_ref_count()
-    }
-
-    /// Poll this service ready.
-    pub fn poll_ready<Request>(&mut self) -> Poll<Result<(), T::Error>>
-    where
-        T: Service<Request>,
-    {
-        let task = &mut self.task;
-        let inner = &mut self.inner;
-
-        task.enter(|cx, _| inner.poll_ready(cx))
     }
 
     /// Call the inner Service.
